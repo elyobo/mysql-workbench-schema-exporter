@@ -1,7 +1,8 @@
 <?php
+require_once __DIR__ . '/autoload.php';
 
 /*
- * Copyright (c) 2012 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2012-2013 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -163,21 +164,17 @@ function main($filename, $dir, $params, $options)
         $setup = array();
         $configs = array();
 
-        // enable autoloading of classes
-        $libDir = __DIR__.'/../lib';
-        require_once($libDir.'/MwbExporter/SplClassLoader.php');
-
-        $classLoader = new SplClassLoader();
-        $classLoader->setIncludePath($libDir);
-        $classLoader->register();
 
         // bootstrap
         $bootstrap = new Bootstrap();
         if ($options[CMD_OPT_LIST_EXPORTER]) {
+            $formatters = $bootstrap->getFormatters();
+            // find the longest formatter name
+            $len = max(array_map('strlen', array_keys($formatters))) + 1;
             echo "Supported exporter:\n";
-            foreach ($bootstrap->getFormatters() as $name => $class) {
+            foreach ($formatters as $name => $class) {
                 $formatter = $bootstrap->getFormatter($name);
-                echo sprintf("- %-25s %s\n", $name, $formatter->getTitle());
+                echo sprintf("- %-".$len."s %s\n", $name, $formatter->getTitle());
             }
             die(0);
         }

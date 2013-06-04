@@ -4,7 +4,7 @@
  * The MIT License
  *
  * Copyright (c) 2010 Johannes Mueller <circus2(at)web.de>
- * Copyright (c) 2012 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2012-2013 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@ use MwbExporter\Formatter\Doctrine2\Model\Table as BaseTable;
 use MwbExporter\Formatter\Doctrine2\Yaml\Formatter;
 use MwbExporter\Writer\WriterInterface;
 use MwbExporter\Object\YAML;
-use MwbExporter\Helper\Pluralizer;
+use Doctrine\Common\Inflector\Inflector;
 
 class Table extends BaseTable
 {
@@ -40,18 +40,18 @@ class Table extends BaseTable
         switch (true) {
             case ($this->isExternal()): 
                 return self::WRITE_EXTERNAL;
-                break;
+
             case ($this->isManyToMany()):
                 return self::WRITE_M2M;
-                break;
+
+            default:
+                $writer
+                    ->open($this->getTableFileName())
+                    ->write($this->asYAML())
+                    ->close()
+                ;
+                return self::WRITE_OK;
         }
-
-        $writer
-            ->open($this->getTableFileName())
-            ->write($this->asYAML())
-            ->close();
-
-        return self::WRITE_OK;
     }
 
     public function asYAML()
@@ -61,6 +61,12 @@ class Table extends BaseTable
             'type' => 'entity',
             'table' => $this->getRawTableName(), 
         );
+        if ($this->getDocument()->getConfig()->get(Formatter::CFG_AUTOMATIC_REPOSITORY)) {
+            if ($repositoryNamespace = $this->getDocument()->getConfig()->get(Formatter::CFG_REPOSITORY_NAMESPACE)) {
+                $repositoryNamespace .= '\\';
+            }
+            $values['repositoryClass'] = $repositoryNamespace.$this->getModelName().'Repository';
+        }
         // indices
         if (count($this->getIndexes())) {
             $values['indexes'] = array();
@@ -108,11 +114,11 @@ class Table extends BaseTable
             $mappings = array(
                 'targetEntity' => $relation['refTable']->getModelNameAsFQCN($this->getEntityNamespace()),
                 'mappedBy'     => null,
-                'inversedBy'   => lcfirst(Pluralizer::pluralize($this->getModelName())),
+                'inversedBy'   => lcfirst(Inflector::pluralize($this->getModelName())),
                 'cascade'      => $formatter->getCascadeOption($relation['reference']->parseComment('cascade')),
                 'fetch'        => $formatter->getFetchOption($relation['reference']->parseComment('fetch')),
             );
-            $relationName = Pluralizer::pluralize($relation['refTable']->getRawTableName());
+            $relationName = Inflector::pluralize($relation['refTable']->getRawTableName());
             // if this is the owning side, also output the JoinTable Annotation
             // otherwise use "mappedBy" feature
             if ($isOwningSide) {

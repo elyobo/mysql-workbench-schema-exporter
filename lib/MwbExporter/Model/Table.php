@@ -4,7 +4,7 @@
  * The MIT License
  *
  * Copyright (c) 2010 Johannes Mueller <circus2(at)web.de>
- * Copyright (c) 2012 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2012-2013 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
 namespace MwbExporter\Model;
 
 use MwbExporter\Formatter\FormatterInterface;
-use MwbExporter\Helper\Pluralizer;
+use Doctrine\Common\Inflector\Inflector;
 use MwbExporter\Helper\Singularizer;
 use MwbExporter\Writer\WriterInterface;
 
@@ -226,9 +226,9 @@ class Table extends Base
     {
         if (null === $this->isM2M) {
             switch (true) {
-                // user hinted that this is not a m2m table
-                case ("false" === $this->parseComment('m2m')):
-                    $this->isM2M = false;
+                // user hinted that this is a m2m table or not
+                case in_array($m2m = $this->parseComment('m2m'), array('true', 'false')):
+                    $this->isM2M = 'true' === $m2m ? true : false;
                     break;
 
                 // user hinted that this is a m2m table
@@ -321,14 +321,18 @@ class Table extends Base
      */
     public function getModelName()
     {
-        $tablename = $this->getRawTableName();
+        $tableName = $this->getRawTableName();
         // check if table name is plural --> convert to singular
-        if (!$this->getDocument()->getConfig()->get(FormatterInterface::CFG_SKIP_PLURAL) && Pluralizer::wordIsPlural($tablename)) {
-            $tablename = Singularizer::singularize($tablename);
+
+        if (
+            !$this->getDocument()->getConfig()->get(FormatterInterface::CFG_SKIP_PLURAL) &&
+            ($tableName == ($singular = Inflector::singularize($tableName)))
+        ) {
+            $tableName = $singular;
         }
 
         // camleCase under scores for model names
-        return ucfirst(preg_replace('@\_(\w)@e', 'ucfirst("$1")', $tablename));
+        return ucfirst(preg_replace('@\_(\w)@e', 'ucfirst("$1")', $tableName));
     }
 
     /**
@@ -338,7 +342,7 @@ class Table extends Base
      */
     public function getModelNameInPlural()
     {
-        return Pluralizer::pluralize($this->getModelName());
+        return Inflector::pluralize($this->getModelName());
     }
 
     /**

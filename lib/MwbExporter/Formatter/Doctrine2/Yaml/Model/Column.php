@@ -4,7 +4,7 @@
  * The MIT License
  *
  * Copyright (c) 2010 Johannes Mueller <circus2(at)web.de>
- * Copyright (c) 2012 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2012-2013 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
 namespace MwbExporter\Formatter\Doctrine2\Yaml\Model;
 
 use MwbExporter\Formatter\Doctrine2\Model\Column as BaseColumn;
-use MwbExporter\Helper\Pluralizer;
+use Doctrine\Common\Inflector\Inflector;
 
 class Column extends BaseColumn
 {
@@ -46,10 +46,10 @@ class Column extends BaseColumn
         if ($this->isUnique) {
             $values['unique'] = true;
         }
-        if ($this->getParameters()->get('isNotNull') != 1) {
+        if (!$this->isNotNull()) {
             $values['nullable'] = true;
         }
-        if ($this->getParameters()->get('autoIncrement') == 1) {
+        if ($this->isAutoIncrement()) {
             $values['generator'] = array('strategy' => 'AUTO');
         }
 
@@ -80,7 +80,7 @@ class Column extends BaseColumn
                 if (!isset($values[static::RELATION_ONE_TO_MANY])) {
                     $values[static::RELATION_ONE_TO_MANY] = array();
                 }
-                $values[static::RELATION_ONE_TO_MANY][Pluralizer::pluralize($relationName)] = array(
+                $values[static::RELATION_ONE_TO_MANY][Inflector::pluralize($relationName)] = array(
                     'targetEntity'  => $targetEntityFQCN,
                     'mappedBy'      => lcfirst($mappedBy),
                     'cascade'       => $formatter->getCascadeOption($foreign->parseComment('cascade')),
@@ -90,7 +90,7 @@ class Column extends BaseColumn
                         'name'                 => $foreign->getForeign()->getColumnName(),
                         'referencedColumnName' => $foreign->getLocal()->getColumnName(),
                         'onDelete'             => $formatter->getDeleteRule($foreign->getLocal()->getParameters()->get('deleteRule')),
-                        'nullable'             => !$foreign->getForeign()->getParameters()->get('isNotNull') ? null : false,
+                        'nullable'             => !$foreign->getForeign()->isNotNull() ? null : false,
                     ),
                 );
             } else {
@@ -104,7 +104,7 @@ class Column extends BaseColumn
                         'name'                 => $foreign->getForeign()->getColumnName(),
                         'referencedColumnName' => $foreign->getLocal()->getColumnName(),
                         'onDelete'             => $formatter->getDeleteRule($foreign->getLocal()->getParameters()->get('deleteRule')),
-                        'nullable'             => !$foreign->getForeign()->getParameters()->get('isNotNull') ? null : false,
+                        'nullable'             => !$foreign->getForeign()->isNotNull() ? null : false,
                     ),
                 );
             }
@@ -123,12 +123,12 @@ class Column extends BaseColumn
                 }
                 $values[static::RELATION_MANY_TO_ONE][$relationName] = array(
                     'targetEntity' => $targetEntity,
-                    'inversedBy'   => $this->local->parseComment('unidirectional') === 'true' ? null : lcfirst(Pluralizer::pluralize($inversedBy)),
+                    'inversedBy'   => $this->local->parseComment('unidirectional') === 'true' ? null : lcfirst(Inflector::pluralize($inversedBy)),
                     'joinColumn'   => array(
                         'name'                 => $this->local->getForeign()->getColumnName(),
                         'referencedColumnName' => $this->local->getLocal()->getColumnName(),
                         'onDelete'             => $formatter->getDeleteRule($this->local->getParameters()->get('deleteRule')),
-                        'nullable'             => !$this->local->getForeign()->getParameters()->get('isNotNull') ? null : false,
+                        'nullable'             => !$this->local->getForeign()->isNotNull() ? null : false,
                     ),
                 );
             } else {
@@ -142,7 +142,7 @@ class Column extends BaseColumn
                         'name'                 => $this->local->getForeign()->getColumnName(),
                         'referencedColumnName' => $this->local->getLocal()->getColumnName(),
                         'onDelete'             => $formatter->getDeleteRule($this->local->getParameters()->get('deleteRule')),
-                        'nullable'             => !$this->local->getForeign()->getParameters()->get('isNotNull') ? null : false,
+                        'nullable'             => !$this->local->getForeign()->isNotNull() ? null : false,
                     ),
                 );
             }

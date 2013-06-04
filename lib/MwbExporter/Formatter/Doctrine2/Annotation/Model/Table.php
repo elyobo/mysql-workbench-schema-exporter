@@ -4,7 +4,7 @@
  * The MIT License
  *
  * Copyright (c) 2010 Johannes Mueller <circus2(at)web.de>
- * Copyright (c) 2012 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2012-2013 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
 namespace MwbExporter\Formatter\Doctrine2\Annotation\Model;
 
 use MwbExporter\Formatter\Doctrine2\Model\Table as BaseTable;
-use MwbExporter\Helper\Pluralizer;
+use Doctrine\Common\Inflector\Inflector;
 use MwbExporter\Object\Annotation;
 use MwbExporter\Writer\WriterInterface;
 use MwbExporter\Formatter\Doctrine2\Annotation\Formatter;
@@ -56,7 +56,7 @@ class Table extends BaseTable
     }
 
     /**
-     * Get collection interface class.
+     * Get collection interface class name.
      *
      * @param bool $absolute Use absolute class name
      * @return string
@@ -196,10 +196,11 @@ class Table extends BaseTable
                 ->write(' * '.$this->getAnnotation('Table', array('name' => $this->quoteIdentifier($this->getRawTableName()), 'indexes' => $this->getIndexesAnnotation(), 'uniqueConstraints' => $this->getUniqueConstraintsAnnotation())))
                 ->writeIf($lifecycleCallbacks, ' * @HasLifecycleCallbacks')
                 ->write(' */')
-                ->write('class '.$this->getModelName())
+                ->write('class '.$this->getModelName().(($implements = $this->getClassImplementations()) ? ' implements '.$implements : ''))
                 ->write('{')
                 ->indent()
                     ->writeCallback(function(WriterInterface $writer, Table $_this = null) use ($skipGetterAndSetter, $serializableEntity, $lifecycleCallbacks) {
+                        $_this->writePreClassHandler($writer);
                         $_this->getColumns()->write($writer);
                         $_this->writeManyToMany($writer);
                         $_this->writeConstructor($writer);
@@ -207,6 +208,7 @@ class Table extends BaseTable
                             $_this->getColumns()->writeGetterAndSetter($writer);
                             $_this->writeManyToManyGetterAndSetter($writer);
                         }
+                        $_this->writePostClassHandler($writer);
                         foreach ($lifecycleCallbacks as $callback => $handlers) {
                             foreach ($handlers as $handler) {
                                 $writer
@@ -237,16 +239,10 @@ class Table extends BaseTable
 
     public function writeUsedClasses(WriterInterface $writer)
     {
-        $count = 0;
-        if ('@ORM\\' === $this->addPrefix()) {
-            $writer->write('use Doctrine\ORM\Mapping as ORM;');
-            $count++;
-        }
-        if (count($this->getManyToManyRelations()) || $this->getColumns()->hasOneToManyRelation()) {
-            $writer->write('use %s;', $this->getCollectionClass());
-            $count++;
-        }
-        if ($count) {
+        if (count($uses = $this->getUsedClasses())) {
+            foreach ($uses as $use) {
+                $writer->write('use %s;', $use);
+            }
             $writer->write('');
         }
 
@@ -262,7 +258,7 @@ class Table extends BaseTable
                 ->writeCallback(function(WriterInterface $writer, Table $_this = null) {
                     $_this->getColumns()->writeArrayCollections($writer);
                     foreach ($_this->getManyToManyRelations() as $relation) {
-                        $writer->write('$this->%s = new %s();', lcfirst(Pluralizer::pluralize($relation['refTable']->getModelName())), $_this->getCollectionClass(false));
+                        $writer->write('$this->%s = new %s();', lcfirst(Inflector::pluralize($relation['refTable']->getModelName())), $_this->getCollectionClass(false));
                     }
                 })
             ->outdent()
@@ -286,13 +282,12 @@ class Table extends BaseTable
             ->outdent()
             ->write('}')
         ;
+
+        return $this;
     }
 
     public function writeManyToMany(WriterInterface $writer)
     {
-        // @TODO D2A ManyToMany relation joinColumns and inverseColumns
-        // referencing wrong column names
-
         $formatter = $this->getDocument()->getFormatter();
         foreach ($this->manyToManyRelations as $relation) {
             $isOwningSide = $formatter->isOwningSide($relation, $mappedRelation);
@@ -300,7 +295,7 @@ class Table extends BaseTable
             $annotationOptions = array(
                 'targetEntity' => $relation['refTable']->getModelNameAsFQCN($this->getEntityNamespace()),
                 'mappedBy' => null,
-                'inversedBy' => lcfirst(Pluralizer::pluralize($this->getModelName())),
+                'inversedBy' => lcfirst(Inflector::pluralize($this->getModelName())),
                 'cascade' => $formatter->getCascadeOption($relation['reference']->parseComment('cascade')),
                 'fetch' => $formatter->getFetchOption($relation['reference']->parseComment('fetch')),
             );
@@ -349,7 +344,7 @@ class Table extends BaseTable
                 ;
             }
             $writer
-                ->write('protected $'.lcfirst(Pluralizer::pluralize($relation['refTable']->getModelName())).';')
+                ->write('protected $'.lcfirst(Inflector::pluralize($relation['refTable']->getModelName())).';')
                 ->write('')
             ;
         }
@@ -377,7 +372,7 @@ class Table extends BaseTable
                             $writer->write('$%s->add%s($this);', lcfirst($relation['refTable']->getModelName()), $_this->getModelName());
                         }
                     })
-                    ->write('$this->'.lcfirst(Pluralizer::pluralize($relation['refTable']->getModelName())).'[] = $'.lcfirst($relation['refTable']->getModelName()).';')
+                    ->write('$this->'.lcfirst(Inflector::pluralize($relation['refTable']->getModelName())).'[] = $'.lcfirst($relation['refTable']->getModelName()).';')
                     ->write('')
                     ->write('return $this;')
                 ->outdent()
@@ -388,16 +383,65 @@ class Table extends BaseTable
                 ->write(' *')
                 ->write(' * @return '.$this->getCollectionInterface())
                 ->write(' */')
-                ->write('public function get'.Pluralizer::pluralize($relation['refTable']->getModelName()).'()')
+                ->write('public function get'.Inflector::pluralize($relation['refTable']->getModelName()).'()')
                 ->write('{')
                 ->indent()
-                    ->write('return $this->'.lcfirst(Pluralizer::pluralize($relation['refTable']->getModelName())).';')
+                    ->write('return $this->'.lcfirst(Inflector::pluralize($relation['refTable']->getModelName())).';')
                 ->outdent()
                 ->write('}')
                 ->write('')
             ;
         }
 
+        return $this;
+    }
+
+    /**
+     * Get the class name to implements.
+     *
+     * @return string
+     */
+    protected function getClassImplementations()
+    {
+    }
+
+    /**
+     * Get used classes.
+     *
+     * @return array
+     */
+    protected function getUsedClasses()
+    {
+        $uses = array();
+        if ('@ORM\\' === $this->addPrefix()) {
+            $uses[] = 'Doctrine\ORM\Mapping as ORM';
+        }
+        if (count($this->getManyToManyRelations()) || $this->getColumns()->hasOneToManyRelation()) {
+            $uses[] = $this->getCollectionClass();
+        }
+
+        return $uses;
+    }
+
+    /**
+     * Write pre class handler.
+     *
+     * @param \MwbExporter\Writer\WriterInterface $writer
+     * @return \MwbExporter\Formatter\Doctrine2\Annotation\Model\Table
+     */
+    public function writePreClassHandler(WriterInterface $writer)
+    {
+        return $this;
+    }
+
+    /**
+     * Write post class handler.
+     *
+     * @param \MwbExporter\Writer\WriterInterface $writer
+     * @return \MwbExporter\Formatter\Doctrine2\Annotation\Model\Table
+     */
+    public function writePostClassHandler(WriterInterface $writer)
+    {
         return $this;
     }
 }

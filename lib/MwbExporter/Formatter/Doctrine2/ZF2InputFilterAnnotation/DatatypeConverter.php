@@ -4,7 +4,8 @@
  * The MIT License
  *
  * Copyright (c) 2010 Johannes Mueller <circus2(at)web.de>
- * Copyright (c) 2012 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2012-2013 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2013 WitteStier <development@wittestier.nl>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,33 +26,10 @@
  * THE SOFTWARE.
  */
 
-namespace MwbExporter\Helper;
+namespace MwbExporter\Formatter\Doctrine2\ZF2InputFilterAnnotation;
 
-abstract class WordTransform
+use MwbExporter\Formatter\Doctrine2\Annotation\DatatypeConverter as BaseDatatypeConverter;
+
+class DatatypeConverter extends BaseDatatypeConverter
 {
-    /**
-     * Check if the $word string is ending by the $ending string.
-     * 
-     * @param string $word
-     * @param string $ending
-     * @return boolean 
-     */
-    protected static function wordEndsWith($word, $ending)
-    {
-        return preg_match('@'.preg_quote($ending).'$@', $word);
-    }
-
-    /**
-     * Cut the $word string to remove the $ending string.
-     * 
-     * Warning: this method do not check if $ending is inding the string $word.
-     * 
-     * @param string $word
-     * @param string $ending
-     * @return string 
-     */
-    protected static function stripWordEnd($word, $ending)
-    {
-        return substr($word, 0, -strlen($ending));
-    }
 }
